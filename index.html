@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Salas Vazias — Anfiteatros ICC/UnB</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --card: #1a1d24;
+    --card2: #21252e;
+    --border: #2d323d;
+    --text: #e8eaed;
+    --muted: #9aa0ab;
+    --green: #34d17b;
+    --green-dim: rgba(52, 209, 123, 0.12);
+    --red: #f0625d;
+    --red-dim: rgba(240, 98, 93, 0.10);
+    --accent: #6c8cff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    padding: 24px 16px 60px;
+  }
+  .container { max-width: 720px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 22px; }
+  header h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
+  header p { color: var(--muted); font-size: 0.85rem; margin-top: 6px; }
+  header p span { color: var(--accent); }
+
+  .controls {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .controls label { color: var(--muted); font-size: 0.85rem; }
+  input[type="time"] {
+    background: var(--card2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 1.05rem;
+    outline: none;
+    font-variant-numeric: tabular-nums;
+  }
+  input[type="time"]:focus { border-color: var(--accent); }
+  select {
+    background: var(--card2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 0.95rem;
+    outline: none;
+  }
+  button {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 18px;
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter 0.15s;
+  }
+  button:hover { filter: brightness(1.12); }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .now-btn { background: var(--card2); border: 1px solid var(--border); color: var(--text); }
+
+  .status-line {
+    color: var(--muted);
+    font-size: 0.82rem;
+    min-height: 1.2em;
+    margin: 10px 2px 16px;
+  }
+  .status-line.error { color: var(--red); }
+
+  .summary {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .summary .pill {
+    flex: 1;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    text-align: center;
+  }
+  .pill .num { font-size: 1.7rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .pill .lab { color: var(--muted); font-size: 0.78rem; margin-top: 2px; }
+  .pill.livre .num { color: var(--green); }
+  .pill.ocupada .num { color: var(--red); }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+  }
+  .room {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    border-left-width: 4px;
+  }
+  .room.livre { border-left-color: var(--green); }
+  .room.ocupada { border-left-color: var(--red); }
+  .room .name { font-weight: 700; font-size: 1.05rem; }
+  .room .badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    width: fit-content;
+    padding: 3px 9px;
+    border-radius: 20px;
+  }
+  .room.livre .badge { color: var(--green); background: var(--green-dim); }
+  .room.ocupada .badge { color: var(--red); background: var(--red-dim); }
+  .room .info { color: var(--muted); font-size: 0.78rem; line-height: 1.45; }
+  .room .info b { color: var(--text); font-weight: 600; }
+
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.75rem;
+    margin-top: 28px;
+    line-height: 1.6;
+  }
+  .spin {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid var(--muted);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: -2px;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>🪑 Salas Vazias — Anfiteatros</h1>
+    <p>Dados em tempo real do sistema de salas da <span>UnB</span></p>
+  </header>
+
+  <div class="controls">
+    <label for="hora">Horário:</label>
+    <input type="time" id="hora" value="08:00">
+    <select id="dia">
+      <option value="hoje" selected>Hoje</option>
+      <option value="2">Segunda-feira</option>
+      <option value="3">Terça-feira</option>
+      <option value="4">Quarta-feira</option>
+      <option value="5">Quinta-feira</option>
+      <option value="6">Sexta-feira</option>
+    </select>
+    <button class="now-btn" id="btnAgora">🕐 Agora</button>
+    <button id="btnConsultar">Consultar</button>
+  </div>
+
+  <div class="status-line" id="status"></div>
+
+  <div class="summary">
+    <div class="pill livre"><div class="num" id="nLivre">–</div><div class="lab">Vazias</div></div>
+    <div class="pill ocupada"><div class="num" id="nOcup">–</div><div class="lab">Ocupadas</div></div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <footer>
+    Fonte: servicos.unb.br/solicitasaladeaula (agenda semanal pública).<br>
+    Salas Anf09 (indisponível) e Anf10 ainda não incluídas.
+  </footer>
+</div>
+
+<script>
+// idLocal confirmados na API da UnB
+const SALAS = [
+  { id: 159,     nome: 'Anf16' },
+  { id: 141,     nome: 'Anf15' },
+  { id: 132,     nome: 'Anf14' },
+  { id: 124,     nome: 'Anf13' },
+  { id: 183267,  nome: 'Anf12' },
+  { id: 108,     nome: 'Anf11' },
+  { id: 86,      nome: 'Anf08' },
+  { id: 78,      nome: 'Anf07' },
+  { id: 60,      nome: 'Anf06' },
+  { id: 51,      nome: 'Anf05' },
+  { id: 43,      nome: 'Anf04' },
+  { id: 35,      nome: 'Anf03' },
+  { id: 27,      nome: 'Anf02' },
+];
+
+const API = 'https://servicos.unb.br/agenda-api/relatorio/agenda-local?id=';
+const DIAS_SEMANA = { 2: 'Segunda', 3: 'Terça', 4: 'Quarta', 5: 'Quinta', 6: 'Sexta' };
+
+const grid = document.getElementById('grid');
+const statusEl = document.getElementById('status');
+const horaInput = document.getElementById('hora');
+const diaSelect = document.getElementById('dia');
+const btnConsultar = document.getElementById('btnConsultar');
+const btnAgora = document.getElementById('btnAgora');
+
+// Armazena as agendas carregadas (cache por id)
+const cacheAgendas = {};
+
+// "08:00h - 08:55h" => {ini: 480, fim: 535} (minutos)
+function parseLabel(label) {
+  const m = label.match(/(\d{1,2}):(\d{2})\s*h?\s*-\s*(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  return {
+    ini: parseInt(m[1]) * 60 + parseInt(m[2]),
+    fim: parseInt(m[3]) * 60 + parseInt(m[4]),
+  };
+}
+
+function hmParaMin(hhmm) {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+}
+
+async function carregarSala(sala) {
+  if (cacheAgendas[sala.id]) return cacheAgendas[sala.id];
+  const r = await fetch(API + sala.id);
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const j = await r.json();
+  const d = (j.data && j.data[0]) || null;
+  cacheAgendas[sala.id] = d;
+  return d;
+}
+
+// d = {dia2..dia7}; retorna lista de aulas do dia escolhido
+function aulasDoDia(d, diaSemana) {
+  if (!d) return [];
+  const arr = d['dia' + diaSemana] || [];
+  return arr.map(x => ({ ...parseLabel(x.label), turma: x.turma, label: x.label })).filter(x => x.ini != null);
+}
+
+function ocupadaNoHorario(aulas, minutos) {
+  return aulas.find(a => minutos >= a.ini && minutos < a.fim) || null;
+}
+
+function proximoCompromisso(aulas, minutos) {
+  const futuras = aulas.filter(a => a.ini >= minutos).sort((a, b) => a.ini - b.ini);
+  return futuras[0] || null;
+}
+
+function render(resultados, diaSemana, minutos) {
+  grid.innerHTML = '';
+  let livres = 0, ocupadas = 0;
+
+  for (const r of resultados) {
+    const aulas = aulasDoDia(r.dados, diaSemana);
+    const ocup = ocupadaNoHorario(aulas, minutos);
+    const prox = ocup ? null : proximoCompromisso(aulas, minutos);
+
+    const div = document.createElement('div');
+    div.className = 'room ' + (ocup ? 'ocupada' : 'livre');
+
+    let info;
+    if (ocup) {
+      info = `<b>${escapeHtml(ocup.turma || 'Aula')}</b><br>${ocup.label}`;
+    } else if (prox) {
+      info = `Próxima aula: <b>${escapeHtml(prox.turma || '')}</b><br>${prox.label} (a partir das ${minStr(prox.ini)})`;
+    } else {
+      info = 'Livre até o fim do dia ✓';
+    }
+
+    div.innerHTML = `
+      <div class="name">${r.nome}</div>
+      <div class="badge">${ocup ? '● Ocupada' : '○ Vazia'}</div>
+      <div class="info">${info}</div>`;
+    grid.appendChild(div);
+
+    if (ocup) ocupadas++; else livres++;
+  }
+
+  document.getElementById('nLivre').textContent = livres;
+  document.getElementById('nOcup').textContent = ocupadas;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function minStr(min) {
+  return String(Math.floor(min / 60)).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0');
+}
+
+async function consultar() {
+  const hhmm = horaInput.value || '08:00';
+  const minutos = hmParaMin(hhmm);
+
+  let diaSemana;
+  if (diaSelect.value === 'hoje') {
+    // JS: 0=dom..6=sab ; API: 2=seg .. 7=sab
+    const js = new Date().getDay();
+    diaSemana = js === 0 ? 8 : js + 1; // domingo sem aula -> trata como vazio
+  } else {
+    diaSemana = parseInt(diaSelect.value);
+  }
+
+  btnConsultar.disabled = true;
+  btnAgora.disabled = true;
+  statusEl.className = 'status-line';
+  statusEl.innerHTML = '<span class="spin"></span>Consultando ' + SALAS.length + ' salas…';
+
+  try {
+    const resultados = await Promise.all(SALAS.map(async s => ({
+      ...s,
+      dados: await carregarSala(s),
+    })));
+
+    const diaTxt = diaSelect.value === 'hoje'
+      ? new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' })
+      : DIAS_SEMANA[diaSemana];
+    statusEl.textContent = `Agenda de ${diaTxt} às ${hhmm} — ${resultados.length} salas`;
+    render(resultados, diaSemana, minutos);
+  } catch (e) {
+    statusEl.className = 'status-line error';
+    statusEl.textContent = 'Erro ao consultar a API da UnB: ' + e.message;
+  } finally {
+    btnConsultar.disabled = false;
+    btnAgora.disabled = false;
+  }
+}
+
+btnAgora.addEventListener('click', () => {
+  const now = new Date();
+  horaInput.value = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  diaSelect.value = 'hoje';
+  consultar();
+});
+btnConsultar.addEventListener('click', consultar);
+horaInput.addEventListener('change', consultar);
+
+// começa no horário atual
+(function init() {
+  const now = new Date();
+  horaInput.value = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  consultar();
+})();
+</script>
+</body>
+</html>
