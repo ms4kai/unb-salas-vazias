@@ -404,15 +404,33 @@ btnAgora.addEventListener('click', () => {
   const now = new Date();
   horaInput.value = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
   diaSelect.value = 'hoje';
+  atualizarOpcoesDia();
   consultar();
 });
 btnConsultar.addEventListener('click', consultar);
 horaInput.addEventListener('change', consultar);
+diaSelect.addEventListener('change', atualizarOpcoesDia);
+
+// Reflete o dia corrente no seletor: o rótulo de "Hoje" mostra o dia real
+// ("Hoje · Sexta") e, enquanto "Hoje" está selecionado, a opção duplicada
+// desse mesmo dia fica oculta — não faz sentido escolher hoje duas vezes.
+function atualizarOpcoesDia() {
+  const js = new Date().getDay();
+  const hojeOpt = diaSelect.querySelector('option[value="hoje"]');
+  hojeOpt.textContent = js === 0 ? 'Hoje (domingo)' : 'Hoje · ' + DIAS_SEMANA[js + 1];
+  const hojeValor = js === 0 ? null : String(js + 1);
+  diaSelect.querySelectorAll('option').forEach(o => {
+    if (o.value !== 'hoje') {
+      o.hidden = diaSelect.value === 'hoje' && o.value === hojeValor;
+    }
+  });
+}
 
 // começa no horário atual
 (function init() {
   const now = new Date();
   horaInput.value = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  atualizarOpcoesDia();
   consultar();
 })();
 </script>
