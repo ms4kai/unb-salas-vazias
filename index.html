@@ -135,6 +135,8 @@
   }
   .room.livre .badge { color: var(--green); background: var(--green-dim); }
   .room.ocupada .badge { color: var(--red); background: var(--red-dim); }
+  .room.semdados { border-left-color: var(--muted); }
+  .room.semdados .badge { color: var(--muted); background: rgba(154, 160, 171, 0.12); }
   .room .info { color: var(--muted); font-size: 0.78rem; line-height: 1.45; }
   .room .info b { color: var(--text); font-weight: 600; }
 
@@ -223,8 +225,17 @@ const diaSelect = document.getElementById('dia');
 const btnConsultar = document.getElementById('btnConsultar');
 const btnAgora = document.getElementById('btnAgora');
 
-// Armazena as agendas carregadas (cache por id)
-const cacheAgendas = {};
+// Armazena as agendas carregadas (cache por id; a agenda é semanal, então
+// o cache vale só para o dia corrente e é limpo na virada do dia)
+const cacheAgendas = { __dia: null };
+
+function limparCacheSeNovoDia() {
+  const hoje = new Date().toDateString();
+  if (cacheAgendas.__dia !== hoje) {
+    for (const k of Object.keys(cacheAgendas)) delete cacheAgendas[k];
+    cacheAgendas.__dia = hoje;
+  }
+}
 
 // "08:00h - 08:55h" => {ini: 480, fim: 535} (minutos)
 function parseLabel(label) {
@@ -242,7 +253,8 @@ function hmParaMin(hhmm) {
 }
 
 async function carregarSala(sala) {
-  if (cacheAgendas[sala.id]) return cacheAgendas[sala.id];
+  limparCacheSeNovoDia();
+  if (sala.id in cacheAgendas) return cacheAgendas[sala.id];
   const r = await fetch(API + sala.id);
   if (!r.ok) throw new Error('HTTP ' + r.status);
   const j = await r.json();
@@ -251,11 +263,19 @@ async function carregarSala(sala) {
   return d;
 }
 
-// d = {dia2..dia7}; retorna lista de aulas do dia escolhido
+// d = {dia2..dia7}; retorna as aulas do dia escolhido e quantos rótulos não
+// casaram com o padrão de horário (descartados, para sinalizar na interface)
 function aulasDoDia(d, diaSemana) {
-  if (!d) return [];
+  if (!d) return { aulas: [], ignorados: 0 };
+  let ignorados = 0;
   const arr = d['dia' + diaSemana] || [];
-  return arr.map(x => ({ ...parseLabel(x.label), turma: x.turma, label: x.label })).filter(x => x.ini != null);
+  const aulas = arr
+    .map(x => ({ ...parseLabel(x.label), turma: x.turma, label: x.label }))
+    .filter(x => {
+      if (x.ini == null) { ignorados++; return false; }
+      return true;
+    });
+  return { aulas, ignorados };
 }
 
 function ocupadaNoHorario(aulas, minutos) {
@@ -269,21 +289,35 @@ function proximoCompromisso(aulas, minutos) {
 
 function render(resultados, diaSemana, minutos) {
   grid.innerHTML = '';
-  let livres = 0, ocupadas = 0;
+  let livres = 0, ocupadas = 0, semDados = 0, ignorados = 0;
 
   for (const r of resultados) {
-    const aulas = aulasDoDia(r.dados, diaSemana);
+    const div = document.createElement('div');
+    const { aulas, ignorados: ign } = aulasDoDia(r.dados, diaSemana);
+    ignorados += ign;
+
+    // sala sem agenda: estado próprio, fora da contagem de vazias/ocupadas
+    if (r.dados == null) {
+      semDados++;
+      div.className = 'room semdados';
+      div.innerHTML = `
+        <div class="name">${r.nome}</div>
+        <div class="badge">– Sem dados</div>
+        <div class="info">Agenda indisponível para esta sala.</div>`;
+      grid.appendChild(div);
+      continue;
+    }
+
     const ocup = ocupadaNoHorario(aulas, minutos);
     const prox = ocup ? null : proximoCompromisso(aulas, minutos);
 
-    const div = document.createElement('div');
     div.className = 'room ' + (ocup ? 'ocupada' : 'livre');
 
     let info;
     if (ocup) {
-      info = `<b>${escapeHtml(ocup.turma || 'Aula')}</b><br>${ocup.label}`;
+      info = `<b>${escapeHtml(ocup.turma || 'Aula')}</b><br>${escapeHtml(ocup.label)}`;
     } else if (prox) {
-      info = `Próxima aula: <b>${escapeHtml(prox.turma || '')}</b><br>${prox.label} (a partir das ${minStr(prox.ini)})`;
+      info = `Próxima aula: <b>${escapeHtml(prox.turma || '')}</b><br>${escapeHtml(prox.label)}`;
     } else {
       info = 'Livre até o fim do dia ✓';
     }
@@ -299,14 +333,11 @@ function render(resultados, diaSemana, minutos) {
 
   document.getElementById('nLivre').textContent = livres;
   document.getElementById('nOcup').textContent = ocupadas;
+  return { semDados, ignorados };
 }
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-
-function minStr(min) {
-  return String(Math.floor(min / 60)).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0');
 }
 
 async function consultar() {
@@ -317,7 +348,16 @@ async function consultar() {
   if (diaSelect.value === 'hoje') {
     // JS: 0=dom..6=sab ; API: 2=seg .. 7=sab
     const js = new Date().getDay();
-    diaSemana = js === 0 ? 8 : js + 1; // domingo sem aula -> trata como vazio
+    if (js === 0) {
+      // domingo: sem aulas na semana — estado explícito, não "tudo vazio"
+      grid.innerHTML = '';
+      document.getElementById('nLivre').textContent = '–';
+      document.getElementById('nOcup').textContent = '–';
+      statusEl.className = 'status-line';
+      statusEl.textContent = 'Hoje é domingo — não há aulas nos anfiteatros.';
+      return;
+    }
+    diaSemana = js + 1;
   } else {
     diaSemana = parseInt(diaSelect.value);
   }
@@ -328,16 +368,28 @@ async function consultar() {
   statusEl.innerHTML = '<span class="spin"></span>Consultando ' + SALAS.length + ' salas…';
 
   try {
-    const resultados = await Promise.all(SALAS.map(async s => ({
-      ...s,
-      dados: await carregarSala(s),
-    })));
+    // allSettled: falha em uma sala não derruba a consulta das demais
+    const settled = await Promise.allSettled(
+      SALAS.map(async s => ({ ...s, dados: await carregarSala(s) })));
+    const resultados = [];
+    let falhas = 0;
+    for (const r of settled) {
+      if (r.status === 'fulfilled') resultados.push(r.value);
+      else falhas++;
+    }
+    if (!resultados.length) {
+      throw new Error(falhas + ' salas sem resposta (API indisponível?)');
+    }
 
     const diaTxt = diaSelect.value === 'hoje'
       ? new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' })
       : DIAS_SEMANA[diaSemana];
-    statusEl.textContent = `Agenda de ${diaTxt} às ${hhmm} — ${resultados.length} salas`;
-    render(resultados, diaSemana, minutos);
+    const { semDados, ignorados } = render(resultados, diaSemana, minutos);
+    let txt = `Agenda de ${diaTxt} às ${hhmm} — ${resultados.length} salas`;
+    if (falhas) txt += ` · ${falhas} sem resposta`;
+    if (semDados) txt += ` · ${semDados} sem dados`;
+    if (ignorados) txt += ` · ⚠ ${ignorados} aula(s) com horário fora do padrão ignorada(s)`;
+    statusEl.textContent = txt;
   } catch (e) {
     statusEl.className = 'status-line error';
     statusEl.textContent = 'Erro ao consultar a API da UnB: ' + e.message;
