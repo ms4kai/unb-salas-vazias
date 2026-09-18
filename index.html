@@ -411,17 +411,21 @@ btnConsultar.addEventListener('click', consultar);
 horaInput.addEventListener('change', consultar);
 diaSelect.addEventListener('change', atualizarOpcoesDia);
 
-// Reflete o dia corrente no seletor: o rótulo de "Hoje" mostra o dia real
-// ("Hoje · Sexta") e, enquanto "Hoje" está selecionado, a opção duplicada
-// desse mesmo dia fica oculta — não faz sentido escolher hoje duas vezes.
+// Reflete o dia corrente no seletor: com "Hoje" selecionado, o rótulo mostra
+// o dia real ("Hoje · Sexta") e a opção duplicada desse mesmo dia fica
+// oculta — não faz sentido escolher hoje duas vezes. Ao selecionar um dia
+// específico, "Hoje" volta ao rótulo simples para não duplicar o dia na lista.
 function atualizarOpcoesDia() {
   const js = new Date().getDay();
-  const hojeOpt = diaSelect.querySelector('option[value="hoje"]');
-  hojeOpt.textContent = js === 0 ? 'Hoje (domingo)' : 'Hoje · ' + DIAS_SEMANA[js + 1];
+  const selecionadoHoje = diaSelect.value === 'hoje';
   const hojeValor = js === 0 ? null : String(js + 1);
+  const hojeOpt = diaSelect.querySelector('option[value="hoje"]');
+  hojeOpt.textContent = selecionadoHoje
+    ? (js === 0 ? 'Hoje (domingo)' : 'Hoje · ' + DIAS_SEMANA[js + 1])
+    : 'Hoje';
   diaSelect.querySelectorAll('option').forEach(o => {
     if (o.value !== 'hoje') {
-      o.hidden = diaSelect.value === 'hoje' && o.value === hojeValor;
+      o.hidden = selecionadoHoje && o.value === hojeValor;
     }
   });
 }
