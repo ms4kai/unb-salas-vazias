@@ -177,6 +177,7 @@
       <option value="4">Quarta-feira</option>
       <option value="5">Quinta-feira</option>
       <option value="6">Sexta-feira</option>
+      <option value="7">Sábado</option>
     </select>
     <button class="now-btn" id="btnAgora">🕐 Agora</button>
     <button id="btnConsultar">Consultar</button>
@@ -216,7 +217,7 @@ const SALAS = [
 ];
 
 const API = 'https://servicos.unb.br/agenda-api/relatorio/agenda-local?id=';
-const DIAS_SEMANA = { 2: 'Segunda', 3: 'Terça', 4: 'Quarta', 5: 'Quinta', 6: 'Sexta' };
+const DIAS_SEMANA = { 2: 'Segunda', 3: 'Terça', 4: 'Quarta', 5: 'Quinta', 6: 'Sexta', 7: 'Sábado' };
 
 const grid = document.getElementById('grid');
 const statusEl = document.getElementById('status');
